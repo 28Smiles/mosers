@@ -189,29 +189,47 @@ impl PerlUniProps {
             PerlUniProps::Hiragana => include_str!("../data/perluniprops/Hiragana.txt"),
             PerlUniProps::LineSeparator => include_str!("../data/perluniprops/Line_Separator.txt"),
             PerlUniProps::IsN => include_str!("../data/perluniprops/IsN.txt"),
-            PerlUniProps::HangulSyllables => include_str!("../data/perluniprops/Hangul_Syllables.txt"),
+            PerlUniProps::HangulSyllables => {
+                include_str!("../data/perluniprops/Hangul_Syllables.txt")
+            }
             PerlUniProps::IsSc => include_str!("../data/perluniprops/IsSc.txt"),
             PerlUniProps::IsLower => include_str!("../data/perluniprops/IsLower.txt"),
-            PerlUniProps::IsAlphaUnicharsAu => include_str!("../data/perluniprops/IsAlpha-unichars-au.txt"),
+            PerlUniProps::IsAlphaUnicharsAu => {
+                include_str!("../data/perluniprops/IsAlpha-unichars-au.txt")
+            }
             PerlUniProps::Katakana => include_str!("../data/perluniprops/Katakana.txt"),
-            PerlUniProps::CurrencySymbol => include_str!("../data/perluniprops/Currency_Symbol.txt"),
-            PerlUniProps::IsAlnumUnicharsAu => include_str!("../data/perluniprops/IsAlnum-unichars-au.txt"),
+            PerlUniProps::CurrencySymbol => {
+                include_str!("../data/perluniprops/Currency_Symbol.txt")
+            }
+            PerlUniProps::IsAlnumUnicharsAu => {
+                include_str!("../data/perluniprops/IsAlnum-unichars-au.txt")
+            }
             PerlUniProps::IsUpper => include_str!("../data/perluniprops/IsUpper.txt"),
             PerlUniProps::Han => include_str!("../data/perluniprops/Han.txt"),
             PerlUniProps::Number => include_str!("../data/perluniprops/Number.txt"),
-            PerlUniProps::ClosePunctuation => include_str!("../data/perluniprops/Close_Punctuation.txt"),
+            PerlUniProps::ClosePunctuation => {
+                include_str!("../data/perluniprops/Close_Punctuation.txt")
+            }
             PerlUniProps::IsPi => include_str!("../data/perluniprops/IsPi.txt"),
             PerlUniProps::IsPf => include_str!("../data/perluniprops/IsPf.txt"),
-            PerlUniProps::OpenPunctuation => include_str!("../data/perluniprops/Open_Punctuation.txt"),
+            PerlUniProps::OpenPunctuation => {
+                include_str!("../data/perluniprops/Open_Punctuation.txt")
+            }
             PerlUniProps::CJKSymbols => include_str!("../data/perluniprops/CJKSymbols.txt"),
             PerlUniProps::Punctuation => include_str!("../data/perluniprops/Punctuation.txt"),
-            PerlUniProps::LowercaseLetter => include_str!("../data/perluniprops/Lowercase_Letter.txt"),
+            PerlUniProps::LowercaseLetter => {
+                include_str!("../data/perluniprops/Lowercase_Letter.txt")
+            }
             PerlUniProps::Hangul => include_str!("../data/perluniprops/Hangul.txt"),
             PerlUniProps::IsAlpha => include_str!("../data/perluniprops/IsAlpha.txt"),
             PerlUniProps::IsSo => include_str!("../data/perluniprops/IsSo.txt"),
             PerlUniProps::Separator => include_str!("../data/perluniprops/Separator.txt"),
-            PerlUniProps::TitlecaseLetter => include_str!("../data/perluniprops/Titlecase_Letter.txt"),
-            PerlUniProps::UppercaseLetter => include_str!("../data/perluniprops/Uppercase_Letter.txt"),
+            PerlUniProps::TitlecaseLetter => {
+                include_str!("../data/perluniprops/Titlecase_Letter.txt")
+            }
+            PerlUniProps::UppercaseLetter => {
+                include_str!("../data/perluniprops/Uppercase_Letter.txt")
+            }
             PerlUniProps::CJK => include_str!("../data/perluniprops/CJK.txt"),
             PerlUniProps::Symbol => include_str!("../data/perluniprops/Symbol.txt"),
         }
@@ -822,7 +840,10 @@ impl MosesTokenizer {
 
         let text = text.into();
         let text = apply(Cow::Owned(text), MOSES_PENN_REGEXES_1_0.iter());
-        let text = self.intratoken_slashes.0.replace_all(&*text, self.intratoken_slashes.1);
+        let text = self
+            .intratoken_slashes
+            .0
+            .replace_all(&*text, self.intratoken_slashes.1);
         let text = apply(text, MOSES_PENN_REGEXES_1_1.iter());
         let text = self.handles_nonbreaking_prefixes(&*text);
         let text = apply(Cow::Owned(text), MOSES_PENN_REGEXES_2.iter());
