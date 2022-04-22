@@ -60,22 +60,13 @@ jobs:
           command: clippy
           args: --manifest-path ./mosers/Cargo.toml --all-targets --all-features -- -D warnings
 
-      - name: Run Tests
-        if: matrix.os != 'windows-latest'
-        shell: bash
-        working-directory: ./mosers
-        run: make test
-
-      # Skip integration tests for now on Windows
-      - name: Run lib Tests on Windows
-        if: matrix.os == 'windows-latest'
+      - name: Run lib Tests
         uses: actions-rs/cargo@v1
         with:
           command: test
           args: --verbose --manifest-path ./mosers/Cargo.toml --lib
 
-      - name: Run doc Tests on Windows
-        if: matrix.os == 'windows-latest'
+      - name: Run doc Tests
         uses: actions-rs/cargo@v1
         with:
           command: test
