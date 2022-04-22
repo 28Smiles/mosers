@@ -1,4 +1,4 @@
-use criterion::{black_box, Criterion, criterion_group, criterion_main};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use mosers::{Language, MosesTokenizer};
 
 pub fn tokenizer_benchmark(c: &mut Criterion) {

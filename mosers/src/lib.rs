@@ -1,9 +1,8 @@
-use std::any::Any;
 use std::borrow::Cow;
-use std::ops::Deref;
 use std::slice::Iter;
+
 use lazy_static::lazy_static;
-use regex::{Match, Regex};
+use regex::Regex;
 use strum_macros::EnumString;
 
 #[derive(Copy, Clone, PartialOrd, PartialEq, Debug, EnumString)]
@@ -52,9 +51,9 @@ pub enum Language {
     Zh,
 }
 
-impl Into<&'static str> for Language {
-    fn into(self) -> &'static str {
-        match self {
+impl From<Language> for &'static str {
+    fn from(language: Language) -> Self {
+        match language {
             Language::As => "as",
             Language::Bn => "bn",
             Language::Ca => "ca",
@@ -100,9 +99,9 @@ impl Into<&'static str> for Language {
     }
 }
 
-impl Into<Vec<&'static str>> for Language {
-    fn into(self) -> Vec<&'static str> {
-        let nonbreaking_prefix_file = match self {
+impl From<Language> for Vec<&'static str> {
+    fn from(language: Language) -> Self {
+        let nonbreaking_prefix_file = match language {
             Language::As => include_str!("../data/nonbreaking_prefixes/nonbreaking_prefix.as"),
             Language::Bn => include_str!("../data/nonbreaking_prefixes/nonbreaking_prefix.bn"),
             Language::Ca => include_str!("../data/nonbreaking_prefixes/nonbreaking_prefix.ca"),
@@ -143,14 +142,15 @@ impl Into<Vec<&'static str>> for Language {
             _ => "",
         };
 
-        nonbreaking_prefix_file.lines()
+        nonbreaking_prefix_file
+            .lines()
             .map(|line| line.trim())
-            .filter(|line| !line.starts_with("#") && !line.is_empty())
+            .filter(|line| !line.starts_with('#') && !line.is_empty())
             .collect()
     }
 }
 
-enum PerlUniProps {
+pub enum PerlUniProps {
     IsAlnum,
     Hiragana,
     LineSeparator,
@@ -236,9 +236,7 @@ pub struct MosesPunctNormalizer {
 }
 
 impl MosesPunctNormalizer {
-    pub fn new(
-        lang: Language,
-    ) -> MosesPunctNormalizer {
+    pub fn new(lang: Language) -> MosesPunctNormalizer {
         MosesPunctNormalizer::new_with_options(
             lang,
             Option::None,
@@ -263,7 +261,7 @@ impl MosesPunctNormalizer {
             norm_quote_commas,
             norm_numbers,
             pre_replace_unicode_punct,
-            post_remove_control_chars
+            post_remove_control_chars,
         }
     }
 
@@ -271,77 +269,107 @@ impl MosesPunctNormalizer {
         let text = text.into();
         let text = if *self.pre_replace_unicode_punct.as_ref().unwrap_or(&true) {
             self.replace_unicode_punct(&*text)
-        } else { text };
+        } else {
+            text
+        };
 
         let text = self.extra_whitespace(&*text);
 
         let text = if *self.penn.as_ref().unwrap_or(&true) {
             self.handle_penn_substitutions(text)
-        } else { text };
+        } else {
+            text
+        };
 
         let text = self.normalize_unicode(&*text);
         let text = self.french_quotes(&*text);
         let text = self.handle_pseudo_spaces(&*text);
 
         let text = if *self.penn.as_ref().unwrap_or(&true) {
+            lazy_static! {
+                static ref NORMALIZE_UNICODE_IF_NOT_PENN_0: Regex = Regex::new("`").unwrap();
+                static ref NORMALIZE_UNICODE_IF_NOT_PENN_1: Regex = Regex::new("''").unwrap();
+            }
+            let text = NORMALIZE_UNICODE_IF_NOT_PENN_0.replace_all(&*text, "'");
+            let text = NORMALIZE_UNICODE_IF_NOT_PENN_1.replace_all(&*text, " \" ");
+
+            text.into_owned()
+        } else {
+            text
+        };
+
+        let text = if *self.norm_quote_commas.as_ref().unwrap_or(&true) {
             match &self.lang {
                 Language::En => self.handle_en_quotation_followed_by_comma(text),
-                Language::De | Language::Es | Language::Fr => self.handle_de_es_fr_quotation_followed_by_comma(text),
+                Language::De | Language::Es | Language::Fr => {
+                    self.handle_de_es_fr_quotation_followed_by_comma(text)
+                }
                 _ => text,
             }
-        } else { text };
+        } else {
+            text
+        };
 
         let text = if *self.norm_numbers.as_ref().unwrap_or(&true) {
             match &self.lang {
-                Language::De | Language::Es | Language::Fr | Language::Cz | Language::Cs => self.handle_numbers_comma(text),
+                Language::De | Language::Es | Language::Fr | Language::Cz | Language::Cs => {
+                    self.handle_numbers_comma(text)
+                }
                 _ => self.handle_numbers_point(text),
             }
-        } else { text };
+        } else {
+            text
+        };
 
         if *self.post_remove_control_chars.as_ref().unwrap_or(&false) {
             let remove_control_chars: Regex = Regex::new(r"\p{C}").unwrap();
 
             remove_control_chars.replace_all(&*text, "").to_string()
-        } else { text }
+        } else {
+            text
+        }
     }
 
     fn replace_unicode_punct(&self, text: &str) -> String {
-        let text: String = text.chars().map(|c| match c {
-            '，' => ',',
-            '、' => ',',
-            '”' => '\'',
-            '“' => '\'',
-            '∶' => ':',
-            '：' => ':',
-            '？' => '?',
-            '《' => '\'',
-            '》' => '\'',
-            '）' => ',',
-            '！' => '!',
-            '（' => '(',
-            '；' => ';',
-            '１' => '1',
-            '」' => '\'',
-            '「' => '\'',
-            '０' => '0',
-            '３' => '3',
-            '２' => '2',
-            '５' => '5',
-            '６' => '6',
-            '９' => '9',
-            '７' => '7',
-            '８' => '8',
-            '４' => '4',
-            '～' => '~',
-            '’' => '\'',
-            '━' => '-',
-            '〈' => '<',
-            '〉' => '>',
-            '【' => '[',
-            '】' => ']',
-            '％' => '%',
-            e => e,
-        }).collect();
+        let text: String = text
+            .chars()
+            .map(|c| match c {
+                '，' => ',',
+                '、' => ',',
+                '”' => '\'',
+                '“' => '\'',
+                '∶' => ':',
+                '：' => ':',
+                '？' => '?',
+                '《' => '\'',
+                '》' => '\'',
+                '）' => ',',
+                '！' => '!',
+                '（' => '(',
+                '；' => ';',
+                '１' => '1',
+                '」' => '\'',
+                '「' => '\'',
+                '０' => '0',
+                '３' => '3',
+                '２' => '2',
+                '５' => '5',
+                '６' => '6',
+                '９' => '9',
+                '７' => '7',
+                '８' => '8',
+                '４' => '4',
+                '～' => '~',
+                '’' => '\'',
+                '━' => '-',
+                '〈' => '<',
+                '〉' => '>',
+                '【' => '[',
+                '】' => ']',
+                '％' => '%',
+                e => e,
+            })
+            .collect();
         lazy_static! {
             static ref UNICODE_POINT: Regex = Regex::new("…").unwrap();
             static ref UNICODE_CIRCLE_SPACE_AFTER: Regex = Regex::new(r"。\s*").unwrap();
@@ -439,26 +467,34 @@ impl MosesPunctNormalizer {
     }
 
     fn handle_en_quotation_followed_by_comma(&self, text: String) -> String {
-        let text = Regex::new("\"([,.]+)").unwrap().replace_all(&*text, "\\g$1\"");
+        let text = Regex::new("\"([,.]+)")
+            .unwrap()
+            .replace_all(&*text, "\\g$1\"");
 
         text.to_string()
     }
 
     fn handle_de_es_fr_quotation_followed_by_comma(&self, text: String) -> String {
         let text = Regex::new(",\"").unwrap().replace_all(&*text, "\",");
-        let text = Regex::new("(\\.+)\"(\\s*[^<])").unwrap().replace_all(&*text, "\"\\g$1\\g$2");
+        let text = Regex::new("(\\.+)\"(\\s*[^<])")
+            .unwrap()
+            .replace_all(&*text, "\"\\g$1\\g$2");
 
         text.to_string()
     }
 
     fn handle_numbers_comma(&self, text: String) -> String {
-        let text = Regex::new("(\\d)\\u00A0(\\d)").unwrap().replace_all(&*text, "\\g$1,\\g$2");
+        let text = Regex::new("(\\d)\\u00A0(\\d)")
+            .unwrap()
+            .replace_all(&*text, "\\g$1,\\g$2");
 
         text.to_string()
     }
 
     fn handle_numbers_point(&self, text: String) -> String {
-        let text = Regex::new("(\\d)\\u00A0(\\d)").unwrap().replace_all(&*text, "\\g$1.\\g$2");
+        let text = Regex::new("(\\d)\\u00A0(\\d)")
+            .unwrap()
+            .replace_all(&*text, "\\g$1.\\g$2");
 
         text.to_string()
     }
@@ -480,17 +516,11 @@ pub struct MosesTokenizer {
 impl MosesTokenizer {
     pub fn new(lang: Language) -> MosesTokenizer {
         let nonbreaking_prefixes: Vec<&'static str> = lang.into();
-        let has_number_only = Regex::new(r"[\s]+(#NUMERIC_ONLY#)").unwrap();
         let numeric_only_prefixes: Vec<&'static str> = nonbreaking_prefixes
             .iter()
-            .filter(|prefix| {
-                match has_number_only.find(prefix) {
-                    Some(_) => true,
-                    None => false,
-                }
-            })
+            .filter(|prefix| MosesTokenizer::has_numeric_only(**prefix))
             .map(|prefix| {
-                let splits: Vec<&str> = prefix.rsplit(" ").collect();
+                let splits: Vec<&str> = prefix.rsplit(' ').collect();
 
                 *splits.last().unwrap()
             })
@@ -536,18 +566,17 @@ impl MosesTokenizer {
         is_alnum.push_str(NUKTAS);
         is_alnum.push_str(&*cjk_chars);
 
-        let pad_not_isalnum = (Regex::new(&*format!("([^{}\\s\\.'`,-])", &is_alnum)).unwrap(), " $1 ");
+        let pad_not_isalnum = (
+            Regex::new(&*format!("([^{}\\s\\.'`,-])", &is_alnum)).unwrap(),
+            " $1 ",
+        );
         let aggressive_hyphen_split = (
-            fancy_regex::Regex::new(
-                &*format!("([{}])\\-(?=[{}])", &is_alnum, &is_alnum)
-            ).unwrap(),
-            r"$1 @-@ "
+            fancy_regex::Regex::new(&*format!("([{}])\\-(?=[{}])", &is_alnum, &is_alnum)).unwrap(),
+            r"$1 @-@ ",
         );
         let intratoken_slashes = (
-            fancy_regex::Regex::new(
-                &*format!("([{}])/([{}])", &is_alnum, &is_alnum)
-            ).unwrap(),
-            r"$1 \@/\@ $2"
+            fancy_regex::Regex::new(&*format!("([{}])/([{}])", &is_alnum, &is_alnum)).unwrap(),
+            r"$1 \@/\@ $2",
         );
 
         MosesTokenizer {
@@ -568,16 +597,13 @@ impl MosesTokenizer {
             static ref R2: Regex = Regex::new(r"DOTMULTI\.").unwrap();
         }
 
-        let mut text = DOTMULTI.replace_all(
-            &*text,
-            r" DOTMULTI$1"
-        ).into_owned();
+        let mut text = DOTMULTI.replace_all(&*text, r" DOTMULTI$1").into_owned();
         while MORE.find(&*text).is_some() {
             let ltext = R1.replace_all(&*text, "DOTDOTMULTI $1");
             text = R2.replace_all(ltext.as_ref(), "DOTDOTMULTI").into_owned();
         }
 
-        text.to_string()
+        text
     }
 
     fn restore_multidots(&self, text: String) -> String {
@@ -597,17 +623,15 @@ impl MosesTokenizer {
     fn is_lower(text: &str) -> bool {
         let lower_chars: &'static str = PerlUniProps::IsLower.as_str(); // TODO lazy const set
 
-        text.chars().all(|tc| {
-            lower_chars.chars().any(|lc| lc == tc)
-        })
+        text.chars()
+            .all(|tc| lower_chars.chars().any(|lc| lc == tc))
     }
 
     fn is_any_alpha(text: &str) -> bool {
         let alpha_chars: &'static str = PerlUniProps::IsAlpha.as_str(); // TODO lazy const set
 
-        text.chars().any(|tc| {
-            alpha_chars.chars().any(|lc| lc == tc)
-        })
+        text.chars()
+            .any(|tc| alpha_chars.chars().any(|lc| lc == tc))
     }
 
     fn has_numeric_only(text: &str) -> bool {
@@ -641,21 +665,22 @@ impl MosesTokenizer {
                 //      does not contain #NUMERIC_ONLY#
                 // iii. the token is not the last token and that the
                 //      next token contains all lowercase.
-                let a = prefix.chars().any(|c| c == '.');
-                let b = MosesTokenizer::is_any_alpha(prefix);
+                #[allow(clippy::if_same_then_else)]
                 if (prefix.chars().any(|c| c == '.') && MosesTokenizer::is_any_alpha(prefix))
-                    || (self.nonbreaking_prefixes.iter().any(|nbp| *nbp == prefix) && self.numeric_only_prefixes.iter().any(|nbp| *nbp == prefix))
-                    || (i != tokens.len() - 1 && MosesTokenizer::is_lower(tokens.get(i + 1).unwrap())) {
+                    || (self.nonbreaking_prefixes.iter().any(|nbp| *nbp == prefix)
+                        && self.numeric_only_prefixes.iter().any(|nbp| *nbp == prefix))
+                    || (i != tokens.len() - 1
+                        && MosesTokenizer::is_lower(tokens.get(i + 1).unwrap()))
+                {
+                    collector.push_str(*token);
+                } else if self.numeric_only_prefixes.iter().any(|nbp| *nbp == prefix)
+                    && (i + 1) < tokens.len()
+                    && RE_NUM.is_match(token)
+                {
                     collector.push_str(*token);
                 } else {
-                    if self.numeric_only_prefixes.iter().any(|nbp| *nbp == prefix)
-                        && (i + 1) < tokens.len()
-                        && RE_NUM.is_match(token) {
-                        collector.push_str(*token);
-                    } else {
-                        collector.push_str(prefix);
-                        collector.push_str(" .");
-                    }
+                    collector.push_str(prefix);
+                    collector.push_str(" .");
                 }
             } else {
                 collector.push_str(*token);
@@ -684,7 +709,7 @@ impl MosesTokenizer {
 
     pub fn penn_tokenize<T: Into<String>>(&self, text: T) -> Tokens {
         lazy_static! {
-            static ref MOSES_PENN_REGEXES_1: [(Regex, &'static str); 50] = [
+            static ref MOSES_PENN_REGEXES_1_0: [(Regex, &'static str); 19] = [
                 (Regex::new(r"\s+").unwrap(), " "),
                 (Regex::new(r"[\x00-\x1F]").unwrap(), ""),
                 (Regex::new(r"^``").unwrap(), "`` "),
@@ -696,14 +721,59 @@ impl MosesTokenizer {
                 (Regex::new(r"([ (\[{<])`([^`])").unwrap(), r"$1 ` $2"),
                 (Regex::new(r"([ (\[{<])'").unwrap(), r"$1 ` "),
                 (Regex::new(r"\.\.\.").unwrap(), r" _ELLIPSIS_ "),
-                (Regex::new(&*format!(r"([^{}])[,]([^{}])", PerlUniProps::IsN.as_str(), PerlUniProps::IsN.as_str())).unwrap(), r"$1 , $2"),
-                (Regex::new(&*format!(r"([{}])[,]([^{}])", PerlUniProps::IsN.as_str(), PerlUniProps::IsN.as_str())).unwrap(), r"$1 , $2"),
-                (Regex::new(&*format!(r"([^{}])[,]([^{}])", PerlUniProps::IsN.as_str(), PerlUniProps::IsN.as_str())).unwrap(), r"$1 , $2"),
-                (Regex::new(&*format!(r"([;:@#\$%&{}{}])", PerlUniProps::IsSc.as_str(), PerlUniProps::IsSo.as_str())).unwrap(), r" $1"),
-                (Regex::new(&*format!(r"([{}])/([{}])", PerlUniProps::IsAlnum.as_str(), PerlUniProps::IsAlnum.as_str())).unwrap(), "$1 @/@ $2"),
-                (Regex::new("([^.])([.])([])}>\"']*) ?$").unwrap(), r"$1 $2$3"),
+                (
+                    Regex::new(&*format!(
+                        r"([^{}])[,]([^{}])",
+                        PerlUniProps::IsN.as_str(),
+                        PerlUniProps::IsN.as_str()
+                    ))
+                    .unwrap(),
+                    r"$1 , $2"
+                ),
+                (
+                    Regex::new(&*format!(
+                        r"([{}])[,]([^{}])",
+                        PerlUniProps::IsN.as_str(),
+                        PerlUniProps::IsN.as_str()
+                    ))
+                    .unwrap(),
+                    r"$1 , $2"
+                ),
+                (
+                    Regex::new(&*format!(
+                        r"([^{}])[,]([^{}])",
+                        PerlUniProps::IsN.as_str(),
+                        PerlUniProps::IsN.as_str()
+                    ))
+                    .unwrap(),
+                    r"$1 , $2"
+                ),
+                (
+                    Regex::new(&*format!(
+                        r"([;:@#\$%&{}{}])",
+                        PerlUniProps::IsSc.as_str(),
+                        PerlUniProps::IsSo.as_str()
+                    ))
+                    .unwrap(),
+                    r" $1"
+                ),
+                (
+                    Regex::new(&*format!(
+                        r"([{}])/([{}])",
+                        PerlUniProps::IsAlnum.as_str(),
+                        PerlUniProps::IsAlnum.as_str()
+                    ))
+                    .unwrap(),
+                    "$1 @/@ $2"
+                ),
+                (
+                    Regex::new("([^.])([.])([])}>\"']*) ?$").unwrap(),
+                    r"$1 $2$3"
+                ),
                 (Regex::new(r"([?!])").unwrap(), r" $1 "),
                 (Regex::new(r"([]\[(){}<>])").unwrap(), r" $1 "),
+            ];
+            static ref MOSES_PENN_REGEXES_1_1: [(Regex, &'static str); 31] = [
                 (Regex::new(r"\(").unwrap(), r"-LRB-"),
                 (Regex::new(r"\)").unwrap(), r"-RRB-"),
                 (Regex::new(r"\[").unwrap(), r"-LSB-"),
@@ -751,20 +821,16 @@ impl MosesTokenizer {
         }
 
         let text = text.into();
-        let text = apply(Cow::Owned(text), MOSES_PENN_REGEXES_1.iter());
+        let text = apply(Cow::Owned(text), MOSES_PENN_REGEXES_1_0.iter());
+        let text = self.intratoken_slashes.0.replace_all(&*text, self.intratoken_slashes.1);
+        let text = apply(text, MOSES_PENN_REGEXES_1_1.iter());
         let text = self.handles_nonbreaking_prefixes(&*text);
         let text = apply(Cow::Owned(text), MOSES_PENN_REGEXES_2.iter());
 
-        Tokens {
-            text
-        }
+        Tokens { text }
     }
 
-    pub fn tokenize<T: Into<String>>(
-        &self,
-        text: T,
-        escape: Option<bool>
-    ) -> Tokens {
+    pub fn tokenize<T: Into<String>>(&self, text: T, escape: Option<bool>) -> Tokens {
         let text = text.into();
         lazy_static! {
             static ref SPACE: Regex = Regex::new(r"\s+").unwrap();
@@ -793,9 +859,12 @@ impl MosesTokenizer {
         let text = self.replace_multidots(text.into_owned());
 
         lazy_static! {
-            static ref COMMA_SEPARATE_1: Regex = Regex::new(&*format!("([^{}])[,]", PerlUniProps::IsN.as_str())).unwrap();
-            static ref COMMA_SEPARATE_2: Regex = Regex::new(&*format!("[,]([^{}])", PerlUniProps::IsN.as_str())).unwrap();
-            static ref COMMA_SEPARATE_3: Regex = Regex::new(&*format!("([{}])[,]$", PerlUniProps::IsN.as_str())).unwrap();
+            static ref COMMA_SEPARATE_1: Regex =
+                Regex::new(&*format!("([^{}])[,]", PerlUniProps::IsN.as_str())).unwrap();
+            static ref COMMA_SEPARATE_2: Regex =
+                Regex::new(&*format!("[,]([^{}])", PerlUniProps::IsN.as_str())).unwrap();
+            static ref COMMA_SEPARATE_3: Regex =
+                Regex::new(&*format!("([{}])[,]$", PerlUniProps::IsN.as_str())).unwrap();
         }
 
         let text = COMMA_SEPARATE_1.replace_all(&*text, "$1 , ");
@@ -805,28 +874,95 @@ impl MosesTokenizer {
         let text = if self.lang == Language::En {
             lazy_static! {
                 static ref ENGLISH_SPECIFIC_APOSTROPHE: [(Regex, &'static str); 5] = [
-                    (Regex::new(&*format!(r"([^{}])[']([^{}])", PerlUniProps::IsAlpha.as_str(), PerlUniProps::IsAlpha.as_str())).unwrap(), r"$1 ' $2"),
-                    (Regex::new(&*format!(r"([^{}{}])[']([{}])", PerlUniProps::IsAlpha.as_str(), PerlUniProps::IsN.as_str(), PerlUniProps::IsAlpha.as_str())).unwrap(), r"$1 ' $2"),
-                    (Regex::new(&*format!(r"([{}])[']([^{}])", PerlUniProps::IsAlpha.as_str(), PerlUniProps::IsAlpha.as_str())).unwrap(), r"$1 ' $2"),
-                    (Regex::new(&*format!(r"([{}])[']([{}])", PerlUniProps::IsAlpha.as_str(), PerlUniProps::IsAlpha.as_str())).unwrap(), r"$1 '$2"),
-                    (Regex::new(&*format!(r"([{}])[']([s])", PerlUniProps::IsN.as_str())).unwrap(), r"$1 '$2"),
+                    (
+                        Regex::new(&*format!(
+                            r"([^{}])[']([^{}])",
+                            PerlUniProps::IsAlpha.as_str(),
+                            PerlUniProps::IsAlpha.as_str()
+                        ))
+                        .unwrap(),
+                        r"$1 ' $2"
+                    ),
+                    (
+                        Regex::new(&*format!(
+                            r"([^{}{}])[']([{}])",
+                            PerlUniProps::IsAlpha.as_str(),
+                            PerlUniProps::IsN.as_str(),
+                            PerlUniProps::IsAlpha.as_str()
+                        ))
+                        .unwrap(),
+                        r"$1 ' $2"
+                    ),
+                    (
+                        Regex::new(&*format!(
+                            r"([{}])[']([^{}])",
+                            PerlUniProps::IsAlpha.as_str(),
+                            PerlUniProps::IsAlpha.as_str()
+                        ))
+                        .unwrap(),
+                        r"$1 ' $2"
+                    ),
+                    (
+                        Regex::new(&*format!(
+                            r"([{}])[']([{}])",
+                            PerlUniProps::IsAlpha.as_str(),
+                            PerlUniProps::IsAlpha.as_str()
+                        ))
+                        .unwrap(),
+                        r"$1 '$2"
+                    ),
+                    (
+                        Regex::new(&*format!(r"([{}])[']([s])", PerlUniProps::IsN.as_str()))
+                            .unwrap(),
+                        r"$1 '$2"
+                    ),
                 ];
             }
             apply(text, ENGLISH_SPECIFIC_APOSTROPHE.iter())
-        } else {
-            if self.lang == Language::Fr || self.lang == Language::It {
-                lazy_static! {
-                    static ref FR_IT_SPECIFIC_APOSTROPHE: [(Regex, &'static str); 4] = [
-                        (Regex::new(&*format!(r"([^{}])[']([^{}])", PerlUniProps::IsAlpha.as_str(), PerlUniProps::IsAlpha.as_str())).unwrap(), r"$1 ' $2"),
-                        (Regex::new(&*format!(r"([^{}])[']([{}])", PerlUniProps::IsAlpha.as_str(), PerlUniProps::IsAlpha.as_str())).unwrap(), r"$1 ' $2"),
-                        (Regex::new(&*format!(r"([{}])[']([^{}])", PerlUniProps::IsAlpha.as_str(), PerlUniProps::IsAlpha.as_str())).unwrap(), r"$1 ' $2"),
-                        (Regex::new(&*format!(r"([{}])[']([{}])", PerlUniProps::IsAlpha.as_str(), PerlUniProps::IsAlpha.as_str())).unwrap(), r"$1' $2"),
-                    ];
-                }
-                apply(text, FR_IT_SPECIFIC_APOSTROPHE.iter())
-            } else {
-                text.into_owned()
+        } else if self.lang == Language::Fr || self.lang == Language::It {
+            lazy_static! {
+                static ref FR_IT_SPECIFIC_APOSTROPHE: [(Regex, &'static str); 4] = [
+                    (
+                        Regex::new(&*format!(
+                            r"([^{}])[']([^{}])",
+                            PerlUniProps::IsAlpha.as_str(),
+                            PerlUniProps::IsAlpha.as_str()
+                        ))
+                        .unwrap(),
+                        r"$1 ' $2"
+                    ),
+                    (
+                        Regex::new(&*format!(
+                            r"([^{}])[']([{}])",
+                            PerlUniProps::IsAlpha.as_str(),
+                            PerlUniProps::IsAlpha.as_str()
+                        ))
+                        .unwrap(),
+                        r"$1 ' $2"
+                    ),
+                    (
+                        Regex::new(&*format!(
+                            r"([{}])[']([^{}])",
+                            PerlUniProps::IsAlpha.as_str(),
+                            PerlUniProps::IsAlpha.as_str()
+                        ))
+                        .unwrap(),
+                        r"$1 ' $2"
+                    ),
+                    (
+                        Regex::new(&*format!(
+                            r"([{}])[']([{}])",
+                            PerlUniProps::IsAlpha.as_str(),
+                            PerlUniProps::IsAlpha.as_str()
+                        ))
+                        .unwrap(),
+                        r"$1' $2"
+                    ),
+                ];
             }
+            apply(text, FR_IT_SPECIFIC_APOSTROPHE.iter())
+        } else {
+            text.into_owned()
         };
 
         let text = self.handles_nonbreaking_prefixes(&*text);
@@ -858,14 +994,12 @@ impl MosesTokenizer {
         let text: &str = text.trim();
         let text: String = text.into();
 
-        Tokens {
-            text
-        }
+        Tokens { text }
     }
 }
 
 pub struct Tokens {
-    pub text: String
+    pub text: String,
 }
 
 impl Tokens {
@@ -888,7 +1022,10 @@ mod tests {
 
         let tkns = tokenizer.tokenize("Machine Learning is great, isn\'t it?", Option::None);
 
-        assert_eq!(tkns.tokens(), ["Machine", "Learning", "is", "great", ",", "isn", "&apos;t", "it", "?"]);
+        assert_eq!(
+            tkns.tokens(),
+            ["Machine", "Learning", "is", "great", ",", "isn", "&apos;t", "it", "?"]
+        );
     }
 
     #[test]
@@ -915,7 +1052,10 @@ mod tests {
 
         let tkns = tokenizer.tokenize("this 'is' the thing", Option::None);
 
-        assert_eq!(tkns.tokens(), ["this", "&apos;", "is", "&apos;", "the", "thing"]);
+        assert_eq!(
+            tkns.tokens(),
+            ["this", "&apos;", "is", "&apos;", "the", "thing"]
+        );
     }
 
     #[test]
@@ -932,40 +1072,43 @@ mod tests {
         let text = "This ain't funny. It's actually hillarious, yet double Ls. | [] < > [ ] & You're gonna shake it off? Don't?";
         let tokenizer = MosesTokenizer::new(Language::En);
         let tkns = tokenizer.tokenize(text, Option::None);
-        assert_eq!(tkns.tokens(), [
-            "This",
-            "ain",
-            "&apos;t",
-            "funny",
-            ".",
-            "It",
-            "&apos;s",
-            "actually",
-            "hillarious",
-            ",",
-            "yet",
-            "double",
-            "Ls",
-            ".",
-            "&#124;",
-            "&#91;",
-            "&#93;",
-            "&lt;",
-            "&gt;",
-            "&#91;",
-            "&#93;",
-            "&amp;",
-            "You",
-            "&apos;re",
-            "gonna",
-            "shake",
-            "it",
-            "off",
-            "?",
-            "Don",
-            "&apos;t",
-            "?",
-        ]);
+        assert_eq!(
+            tkns.tokens(),
+            [
+                "This",
+                "ain",
+                "&apos;t",
+                "funny",
+                ".",
+                "It",
+                "&apos;s",
+                "actually",
+                "hillarious",
+                ",",
+                "yet",
+                "double",
+                "Ls",
+                ".",
+                "&#124;",
+                "&#91;",
+                "&#93;",
+                "&lt;",
+                "&gt;",
+                "&#91;",
+                "&#93;",
+                "&amp;",
+                "You",
+                "&apos;re",
+                "gonna",
+                "shake",
+                "it",
+                "off",
+                "?",
+                "Don",
+                "&apos;t",
+                "?",
+            ]
+        );
     }
 
     #[test]
@@ -973,35 +1116,38 @@ mod tests {
         let text = "By the mid 1990s a version of the game became a Latvian television series (with a parliamentary setting, and played by Latvian celebrities).";
         let tokenizer = MosesTokenizer::new(Language::En);
         let tkns = tokenizer.tokenize(text, Option::None);
-        assert_eq!(tkns.tokens(), [
-            "By",
-            "the",
-            "mid",
-            "1990s",
-            "a",
-            "version",
-            "of",
-            "the",
-            "game",
-            "became",
-            "a",
-            "Latvian",
-            "television",
-            "series",
-            "(",
-            "with",
-            "a",
-            "parliamentary",
-            "setting",
-            ",",
-            "and",
-            "played",
-            "by",
-            "Latvian",
-            "celebrities",
-            ")",
-            "."
-        ]);
+        assert_eq!(
+            tkns.tokens(),
+            [
+                "By",
+                "the",
+                "mid",
+                "1990s",
+                "a",
+                "version",
+                "of",
+                "the",
+                "game",
+                "became",
+                "a",
+                "Latvian",
+                "television",
+                "series",
+                "(",
+                "with",
+                "a",
+                "parliamentary",
+                "setting",
+                ",",
+                "and",
+                "played",
+                "by",
+                "Latvian",
+                "celebrities",
+                ")",
+                "."
+            ]
+        );
     }
 
     #[test]
@@ -1009,7 +1155,13 @@ mod tests {
         let text = "The meeting will take place at 11:00 a.m. Tuesday.";
         let tokenizer = MosesTokenizer::new(Language::En);
         let tkns = tokenizer.tokenize(text, Option::None);
-        assert_eq!(tkns.tokens(), ["The", "meeting", "will", "take", "place", "at", "11", ":", "00", "a.m.", "Tuesday", "."]);
+        assert_eq!(
+            tkns.tokens(),
+            [
+                "The", "meeting", "will", "take", "place", "at", "11", ":", "00", "a.m.",
+                "Tuesday", "."
+            ]
+        );
     }
 
     #[test]
@@ -1030,16 +1182,25 @@ mod tests {
         let text = "Des gens admirent une œuvre d'art.";
         let tokenizer = MosesTokenizer::new(Language::Fr);
         let tkns = tokenizer.tokenize(text, Option::Some(false));
-        assert_eq!(tkns.tokens(), ["Des", "gens", "admirent", "une", "œuvre", "d'", "art", "."]);
+        assert_eq!(
+            tkns.tokens(),
+            ["Des", "gens", "admirent", "une", "œuvre", "d'", "art", "."]
+        );
 
         let text = "...schwer wie ein iPhone 5.";
         let tokenizer = MosesTokenizer::new(Language::De);
         let tkns = tokenizer.tokenize(text, Option::None);
-        assert_eq!(tkns.tokens(), ["...", "schwer", "wie", "ein", "iPhone", "5", "."]);
+        assert_eq!(
+            tkns.tokens(),
+            ["...", "schwer", "wie", "ein", "iPhone", "5", "."]
+        );
 
         let text = "Dvě děti, které běží bez bot.";
         let tokenizer = MosesTokenizer::new(Language::Cz);
         let tkns = tokenizer.tokenize(text, Option::None);
-        assert_eq!(tkns.tokens(), ["Dvě", "děti", ",", "které", "běží", "bez", "bot", "."]);
+        assert_eq!(
+            tkns.tokens(),
+            ["Dvě", "děti", ",", "které", "běží", "bez", "bot", "."]
+        );
     }
 }
