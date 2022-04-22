@@ -1,0 +1,19 @@
+[package]
+name = "mosers-python"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "mosers"
+crate-type = ["cdylib"]
+
+[dependencies]
+strum = "0"
+
+[dependencies.mosers]
+version = "*"
+path = "../mosers"
+
+[dependencies.pyo3]
+version = "0"
+features = ["extension-module"]
