@@ -58,7 +58,7 @@ jobs:
         working-directory: ./python
         run: |         
           python -m venv .env
-          .env/bin/Activate.ps1
+          .env/Scripts/Activate.ps1
           pip install -U pip
           pip install -U maturin
           pip install pytest setuptools_rust
