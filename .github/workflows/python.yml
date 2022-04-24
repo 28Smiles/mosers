@@ -51,7 +51,7 @@ jobs:
           pip install -U maturin
           pip install pytest setuptools_rust
           maturin develop --release
-          pytest pytest/*
+          pytest pytest/test.py
   
       - name: Build Wheel & Run Tests
         if: matrix.os == 'windows-latest'
@@ -63,4 +63,4 @@ jobs:
           pip install -U maturin
           pip install pytest setuptools_rust
           maturin develop --release
-          pytest pytest/*
+          pytest pytest/test.py
