@@ -7,12 +7,11 @@ on:
   pull_request:
 
 jobs:
-  build_and_test:
-    name: Check everything builds & tests
+  build:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-18.04, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v1
@@ -42,7 +41,8 @@ jobs:
           command: clippy
           args: --manifest-path ./python/Cargo.toml --all-targets --all-features -- -D warnings
 
-      - name: Run tests
+      - name: Build Wheel & Run Tests
+        if: matrix.os != 'windows-latest'
         working-directory: ./python
         run: |         
           python -m venv .env
@@ -50,6 +50,17 @@ jobs:
           pip install -U pip
           pip install -U maturin
           pip install pytest setuptools_rust
-          source .env/bin/activate
+          maturin develop --release
+          pytest pytest/*
+  
+      - name: Build Wheel & Run Tests
+        if: matrix.os == 'windows-latest'
+        working-directory: ./python
+        run: |         
+          python -m venv .env
+          .env/bin/Activate.ps1
+          pip install -U pip
+          pip install -U maturin
+          pip install pytest setuptools_rust
           maturin develop --release
           pytest pytest/*
