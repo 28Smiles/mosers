@@ -1,7 +1,6 @@
-use pyo3::prelude::*;
 use mosers::Language;
+use pyo3::prelude::*;
 use std::str::FromStr;
-use pyo3::types::PyList;
 use strum::ParseError;
 
 #[pyclass]
@@ -12,28 +11,32 @@ impl MosesTokenizer {
     #[new]
     fn new(lang: String) -> PyResult<Self> {
         let language: Result<Language, ParseError> = Language::from_str(&*lang);
-        let language = language
-            .map_err(|_| pyo3::exceptions::PyValueError::new_err(""));
+        let language = language.map_err(|_| pyo3::exceptions::PyValueError::new_err(""));
         Ok(MosesTokenizer(mosers::MosesTokenizer::new(language?)))
     }
 
     fn tokenize(
-        mut self_: PyRefMut<'_, Self>,
+        self_: PyRefMut<'_, Self>,
         text: String,
-        escape: Option<bool>
+        escape: Option<bool>,
     ) -> PyResult<Vec<String>> {
         let tokens = self_.0.tokenize(text, escape);
-        let tokens: Vec<String> = tokens.tokens().iter().map(|token| (*token).into()).collect();
+        let tokens: Vec<String> = tokens
+            .tokens()
+            .iter()
+            .map(|token| (*token).into())
+            .collect();
 
         Ok(tokens)
     }
 
-    fn penn_tokenize(
-        mut self_: PyRefMut<'_, Self>,
-        text: String
-    ) -> PyResult<Vec<String>> {
+    fn penn_tokenize(self_: PyRefMut<'_, Self>, text: String) -> PyResult<Vec<String>> {
         let tokens = self_.0.penn_tokenize(text);
-        let tokens: Vec<String> = tokens.tokens().iter().map(|token| (*token).into()).collect();
+        let tokens: Vec<String> = tokens
+            .tokens()
+            .iter()
+            .map(|token| (*token).into())
+            .collect();
 
         Ok(tokens)
     }
@@ -54,22 +57,20 @@ impl MosesPunctNormalizer {
         post_remove_control_chars: Option<bool>,
     ) -> PyResult<Self> {
         let language: Result<Language, ParseError> = Language::from_str(&*lang);
-        let language = language
-            .map_err(|_| pyo3::exceptions::PyValueError::new_err(""));
-        Ok(MosesPunctNormalizer(mosers::MosesPunctNormalizer::new_with_options(
-            language?,
-            penn,
-            norm_quote_commas,
-            norm_numbers,
-            pre_replace_unicode_punct,
-            post_remove_control_chars,
-        )))
+        let language = language.map_err(|_| pyo3::exceptions::PyValueError::new_err(""));
+        Ok(MosesPunctNormalizer(
+            mosers::MosesPunctNormalizer::new_with_options(
+                language?,
+                penn,
+                norm_quote_commas,
+                norm_numbers,
+                pre_replace_unicode_punct,
+                post_remove_control_chars,
+            ),
+        ))
     }
 
-    fn normalize(
-        mut self_: PyRefMut<'_, Self>,
-        text: String
-    ) -> PyResult<String> {
+    fn normalize(self_: PyRefMut<'_, Self>, text: String) -> PyResult<String> {
         let tokens = self_.0.normalize(text);
 
         Ok(tokens)
