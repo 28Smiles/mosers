@@ -23,6 +23,18 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
 
+      - name: Install Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+          architecture: "x64"
+
+      - name: Install Maturin
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: maturin
+
       - name: Lint with RustFmt
         uses: actions-rs/cargo@v1
         with:
@@ -35,18 +47,6 @@ jobs:
         with:
           command: clippy
           args: --manifest-path ./python/Cargo.toml --all-targets --all-features -- -D warnings
-
-      - name: Install Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.9
-          architecture: "x64"
-
-      - name: Install Maturin
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: maturin
 
       - name: Run tests
         working-directory: ./bindings/python
