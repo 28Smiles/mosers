@@ -49,7 +49,7 @@ jobs:
           args: --manifest-path ./python/Cargo.toml --all-targets --all-features -- -D warnings
 
       - name: Run tests
-        working-directory: ./bindings/python
+        working-directory: ./python
         run: |         
           python -m venv .env
           source .env/bin/activate
