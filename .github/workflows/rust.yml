@@ -75,9 +75,8 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           export RUSTFLAGS="-Cinstrument-coverage"
-          cargo build --verbose
           LLVM_PROFILE_FILE="shares-%p-%m.profraw" cargo test --verbose --manifest-path ./mosers/Cargo.toml --lib
-          ./grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" -o lcov.info
+          ./grcov . --binary-path ./mosers/target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" -o lcov.info
           bash <(curl -s https://codecov.io/bash) -f lcov.info
 
       - name: Run doc Tests
