@@ -26,6 +26,7 @@ jobs:
           override: true
 
       - name: Install Grcov
+        if: matrix.os == 'ubuntu-latest'
         run: curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-x86_64-unknown-linux-gnu.tar.bz2 | tar jxf -
 
       # Necessary for now for the cargo cache: https://github.com/actions/cache/issues/133#issuecomment-599102035
@@ -63,7 +64,15 @@ jobs:
           command: clippy
           args: --manifest-path ./mosers/Cargo.toml --all-targets --all-features -- -D warnings
 
-      - name: Run lib tests
+      - name: Run lib Tests
+        if: matrix.os != 'ubuntu-latest'
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --verbose --manifest-path ./mosers/Cargo.toml --lib
+
+      - name: Run lib tests (coverage)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           export RUSTFLAGS="-Cinstrument-coverage"
           cargo build --verbose
